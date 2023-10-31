@@ -26,7 +26,7 @@ fn hash_file(filename: &String) -> Result<Sha512> {
             .into_diagnostic()
             .wrap_err("Failed to read file")?;
         if bytes_read == 0 {
-            break; // Reached end of file
+            break;
         }
         hasher.update(&buffer[..bytes_read]);
     }
@@ -35,14 +35,18 @@ fn hash_file(filename: &String) -> Result<Sha512> {
 
 fn hash_data(data: &String) -> Result<Sha512> {
     let mut hasher = Sha512::new();
-    hasher.update(&data);
+    hasher.update(data);
     Ok(hasher)
+}
+
+fn should_never_happen() -> MietteDiagnostic {
+    MietteDiagnostic::new("this should never happen")
 }
 
 fn hash_from_args(args: &ArgMatches) -> Result<Sha512> {
     args.get_one("data").map_or_else(
-        || hash_file(args.get_one("file").unwrap()),
-        |data| hash_data(data),
+        || hash_file(args.get_one("file").ok_or(should_never_happen())?),
+        hash_data,
     )
 }
 
@@ -142,47 +146,45 @@ async fn main() -> Result<()> {
             let (address, _) = derive_address(hasher)?;
             println!(
                 "send 0.000000000001 XMR to {} to save the timestamp on chain",
-                address.to_string()
+                address
             );
         }
         Some(("verify", sub_matches)) => {
             let hasher = hash_from_args(sub_matches)?;
             let (_, view_pair) = derive_address(hasher)?;
             let rpc_client = monero_rpc::RpcClientBuilder::new()
-                .build(sub_matches.get_one::<String>("node").unwrap())
+                .build(
+                    sub_matches
+                        .get_one::<String>("node")
+                        .ok_or(should_never_happen())?,
+                )
                 .map_err(|err| MietteDiagnostic::new(err.to_string()))?;
             let daemon_rpc_client = rpc_client.daemon_rpc();
             let mut fixed_hash: [u8; 32] = [0; 32];
             hex::decode_to_slice(
-                sub_matches.get_one::<String>("txid").unwrap(),
+                sub_matches
+                    .get_one::<String>("txid")
+                    .ok_or(should_never_happen())?,
                 &mut fixed_hash,
             )
-            .map_err(|err| MietteDiagnostic::new(err.to_string()))?;
+            .into_diagnostic()?;
             let txs_response = daemon_rpc_client
                 .get_transactions(vec![fixed_hash.into()], Some(false), Some(false))
                 .await
                 .map_err(|err| MietteDiagnostic::new(err.to_string()))?;
-            let txs = txs_response
-                .txs
-                .map_or_else(|| Err(MietteDiagnostic::new("no txs")), |txs| Ok(txs))?;
-            let rpc_tx = txs
-                .get(0)
-                .map_or_else(|| Err(MietteDiagnostic::new("no txs[0]")), |txs| Ok(txs))?;
-            let block_height = rpc_tx.block_height.map_or_else(
-                || Err(MietteDiagnostic::new("transaction is still pending")),
-                |height| Ok(height),
-            )?;
-            let tx_bytes = hex::decode(&rpc_tx.as_hex)
-                .map_err(|err| MietteDiagnostic::new(err.to_string()))?;
-            if tx_bytes.len() == 0 {
+            let txs = txs_response.txs.ok_or(MietteDiagnostic::new("no txs"))?;
+            let rpc_tx = txs.get(0).ok_or(MietteDiagnostic::new("no txs[0]"))?;
+            let block_height = rpc_tx
+                .block_height
+                .ok_or(MietteDiagnostic::new("transaction is still pending"))?;
+            let tx_bytes = hex::decode(&rpc_tx.as_hex).into_diagnostic()?;
+            if tx_bytes.is_empty() {
                 Err(MietteDiagnostic::new("empty transaction"))?
             }
-            let tx = monero::consensus::deserialize::<Transaction>(&tx_bytes[..])
-                .map_err(|err| MietteDiagnostic::new(err.to_string()))?;
-            let outputs = tx
-                .check_outputs(&view_pair, 0..1, 0..1)
-                .map_err(|err| MietteDiagnostic::new(err.to_string()))?;
-            if outputs.len() == 0 {
+            let tx =
+                monero::consensus::deserialize::<Transaction>(&tx_bytes[..]).into_diagnostic()?;
+            let outputs = tx.check_outputs(&view_pair, 0..1, 0..1).into_diagnostic()?;
+            if outputs.is_empty() {
                 Err(MietteDiagnostic::new(
                     "transaction does not include a timestamp for the data",
                 ))?
