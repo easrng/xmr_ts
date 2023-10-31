@@ -15,7 +15,7 @@ use std::io::Read;
 fn hash_file(filename: &String) -> Result<Sha512> {
     let file = File::open(filename)
         .into_diagnostic()
-        .wrap_err("Failed to open file")?;
+        .wrap_err("failed to open file")?;
     let mut reader = BufReader::new(file);
     let mut buffer = [0; 4096];
     let mut hasher = Sha512::new();
@@ -24,7 +24,7 @@ fn hash_file(filename: &String) -> Result<Sha512> {
         let bytes_read = reader
             .read(&mut buffer)
             .into_diagnostic()
-            .wrap_err("Failed to read file")?;
+            .wrap_err("failed to read file")?;
         if bytes_read == 0 {
             break;
         }
@@ -56,7 +56,7 @@ fn derive_address(hasher: Sha512) -> Result<(Address, ViewPair)> {
     let public_view = PublicKey::from_private_key(&private_view);
     let public_spend = PublicKey::from_slice(&[0; 32])
         .into_diagnostic()
-        .wrap_err("Failed to derive public spend key")?;
+        .wrap_err("failed to derive public spend key")?;
     Ok((
         Address::standard(Network::Stagenet, public_spend, public_view),
         ViewPair {
@@ -158,7 +158,8 @@ async fn main() -> Result<()> {
                         .get_one::<String>("node")
                         .ok_or(should_never_happen())?,
                 )
-                .map_err(|err| MietteDiagnostic::new(err.to_string()))?;
+                .map_err(|err| MietteDiagnostic::new(err.to_string()))
+                .wrap_err("failed to create rpc client")?;
             let daemon_rpc_client = rpc_client.daemon_rpc();
             let mut fixed_hash: [u8; 32] = [0; 32];
             hex::decode_to_slice(
@@ -167,23 +168,32 @@ async fn main() -> Result<()> {
                     .ok_or(should_never_happen())?,
                 &mut fixed_hash,
             )
-            .into_diagnostic()?;
+            .into_diagnostic()
+            .wrap_err("transaction id is not hexadecimal")?;
             let txs_response = daemon_rpc_client
                 .get_transactions(vec![fixed_hash.into()], Some(false), Some(false))
                 .await
-                .map_err(|err| MietteDiagnostic::new(err.to_string()))?;
-            let txs = txs_response.txs.ok_or(MietteDiagnostic::new("no txs"))?;
-            let rpc_tx = txs.get(0).ok_or(MietteDiagnostic::new("no txs[0]"))?;
+                .map_err(|err| MietteDiagnostic::new(err.to_string()))
+                .wrap_err("failed to get transaction from remote node")?;
+            let not_found = || MietteDiagnostic::new("transaction not found");
+            let txs = txs_response.txs.ok_or(not_found())?;
+            let rpc_tx = txs.get(0).ok_or(not_found())?;
             let block_height = rpc_tx
                 .block_height
                 .ok_or(MietteDiagnostic::new("transaction is still pending"))?;
-            let tx_bytes = hex::decode(&rpc_tx.as_hex).into_diagnostic()?;
+            let tx_bytes = hex::decode(&rpc_tx.as_hex)
+                .into_diagnostic()
+                .wrap_err("remote node returned invalid hexadecimal transaction data")?;
             if tx_bytes.is_empty() {
                 Err(MietteDiagnostic::new("empty transaction"))?
             }
-            let tx =
-                monero::consensus::deserialize::<Transaction>(&tx_bytes[..]).into_diagnostic()?;
-            let outputs = tx.check_outputs(&view_pair, 0..1, 0..1).into_diagnostic()?;
+            let tx = monero::consensus::deserialize::<Transaction>(&tx_bytes[..])
+                .into_diagnostic()
+                .wrap_err("failed to decode transaction")?;
+            let outputs = tx
+                .check_outputs(&view_pair, 0..1, 0..1)
+                .into_diagnostic()
+                .wrap_err("failed to check transaction for outputs")?;
             if outputs.is_empty() {
                 Err(MietteDiagnostic::new(
                     "transaction does not include a timestamp for the data",
