@@ -1,0 +1,15 @@
+{
+  "name": "xmr_ts",
+  "type": "module",
+  "version": "0.1.0",
+  "files": [
+    "xmr_ts_bg.wasm",
+    "xmr_ts.js",
+    "xmr_ts.d.ts"
+  ],
+  "main": "xmr_ts.js",
+  "types": "xmr_ts.d.ts",
+  "sideEffects": [
+    "./snippets/*"
+  ]
+}

@@ -1,0 +1,89 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <title>xmr timestamping</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style>
+      :root {
+        color-scheme: dark light;
+      }
+      input,
+      textarea {
+        width: 100%;
+      }
+      * {
+        box-sizing: border-box;
+      }
+    </style>
+  </head>
+  <body>
+    <form id="timestamp">
+      <fieldset>
+        <legend>timestamp</legend>
+        <label>
+          data<br />
+          <textarea id="timestamp-data" required></textarea>
+        </label>
+        <br />
+        <button>timestamp</button>
+        <div id="timestamp-err"></div>
+        <div
+          id="timestamp-result"
+          style="display: none; margin-top: 1rem; flex-wrap: wrap; gap: 0.5rem"
+        >
+          <div style="flex-grow: 1; width: 200px">
+            Send
+            <abbr style="user-select: all" title="the smallest possible amount"
+              >0.000000000001</abbr
+            >
+            XMR to
+            <code
+              id="address"
+              style="user-select: all; word-wrap: anywhere"
+            ></code>
+            to timestamp your data
+          </div>
+          <img
+            id="qr"
+            style="width: 159px; image-rendering: pixelated; background: #fff"
+          />
+        </div>
+      </fieldset>
+    </form>
+    <form id="verify">
+      <fieldset>
+        <legend>verify</legend>
+        <label>
+          data<br />
+          <textarea id="verify-data" required></textarea>
+        </label>
+        <br />
+        <label>
+          txid<br />
+          <input
+            id="txid"
+            pattern="^[0-9a-fA-F]{64}$"
+            title="txid as hex"
+            required
+          />
+        </label>
+        <br />
+        <label>
+          node<sup
+            >[<a
+              href="https://monero.fail/?chain=monero&network=mainnet&cors=on"
+              >list</a
+            >]</sup
+          ><br />
+          <input id="node" type="url" required />
+        </label>
+        <br />
+        <button>verify</button>
+        <div id="verify-result" style="white-space: pre-wrap"></div>
+      </fieldset>
+    </form>
+    <script type="module" src="app.js"></script>
+  </body>
+</html>
