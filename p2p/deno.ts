@@ -5,6 +5,7 @@ import { serve } from "./net/serve.ts";
 import { Connection } from "./net/types.ts";
 import { runPeer } from "./peer.ts";
 import { pex } from "./pex.ts";
+import { bootstrap } from "./bootstrap.ts";
 
 const db = new SqliteKV();
 const connections = new Map<string, Connection>();
@@ -14,6 +15,7 @@ await runPeer(
     serve(db, connections),
     client(db, connections),
     pex(db, connections),
+    ...Deno.env.get("IS_BOOTSTRAP") ? [] : [bootstrap(db, connections)],
   ),
   connections,
 );

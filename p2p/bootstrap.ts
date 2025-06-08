@@ -7,6 +7,10 @@ export function bootstrap(
   _connections: Map<string, Connection>,
 ): ReadableStream<Connection> {
   return ReadableStream.from((async function* () {
-    yield await connect("https://198.8.58.38:3963");
+    try {
+      yield await connect("https://198.8.58.38:3963");
+    } catch (e) {
+      void console.error("failed to bootstrap", e);
+    }
   })());
 }
