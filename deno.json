@@ -1,0 +1,5 @@
+{
+  "lint": {
+    "plugins": ["./p2p/lint.ts"]
+  }
+}
